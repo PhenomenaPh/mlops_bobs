@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "mlops-bobs"
+name = "mlops_bobs"
 version = "0.1.0"
 description = ""
 authors = ["Rustem Khutiev <76971769+PhenomenaPh@users.noreply.github.com>"]
@@ -7,6 +7,21 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
+fastapi = "^0.104.1"        # REST API framework
+uvicorn = "^0.24.0"         # ASGI server
+grpcio = "^1.59.2"          # gRPC framework
+grpcio-tools = "^1.59.2"    # For generating gRPC code
+pydantic = "^2.4.2"         # Data validation
+python-multipart = "^0.0.6" # For handling file uploads
+scikit-learn = "^1.3.2"     # For ML models
+joblib = "^1.3.2"           # For model serialization
+loguru = "^0.7.2"           # For logging
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+ruff = "^0.1.3"             # For linting
+black = "^23.10.1"          # For code formatting
+pytest-cov = "^4.1.0"       # For test coverage
 
 
 [build-system]
