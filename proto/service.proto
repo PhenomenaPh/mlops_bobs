@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package mlservice;
+
+service ModelService {
+    rpc TrainModel (TrainRequest) returns (TrainResponse);
+    rpc GetModels (Empty) returns (ModelList);
+    rpc Predict (PredictRequest) returns (PredictResponse);
+    rpc RetrainModel (RetrainRequest) returns (RetrainResponse);
+    rpc DeleteModel (DeleteRequest) returns (DeleteResponse);
+    rpc CheckStatus (Empty) returns (StatusResponse);
+}
+
+message TrainingRow {
+    repeated float features = 1;
+}
+
+message TrainRequest {
+    string model_type = 1;
+    map<string, string> hyperparameters = 2;
+    repeated TrainingRow training_data = 3;
+    repeated float target = 4;  // Добавляем поле target для целевой переменной
+}
+
+message TrainResponse {
+    string model_id = 1;
+}
+
+message PredictRequest {
+    string model_id = 1;
+    repeated TrainingRow data = 2;
+}
+
+message PredictResponse {
+    repeated float predictions = 1;
+}
+
+message RetrainRequest {
+    string model_id = 1;
+    map<string, string> hyperparameters = 2;
+}
+
+message RetrainResponse {
+    string model_id = 1;
+}
+
+message DeleteRequest {
+    string model_id = 1;
+}
+
+message DeleteResponse {
+    bool success = 1;
+}
+
+message Empty {}
+
+message ModelList {
+    repeated string models = 1;
+}
+
+message StatusResponse {
+    string status = 1;
+}
