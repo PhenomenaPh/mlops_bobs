@@ -1,20 +1,29 @@
+"""Core functionality for ML model management."""
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, Optional
+
+import joblib
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
 
 
-logger = logging.getLogger(__name__)
-
-
-class MetaData(BaseModel):
-    """Ml Model Metadata"""
+class ModelMetadata(PydanticBaseModel):
+    """Metadata for ML models."""
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        protected_namespaces=()
+    )
 
     model_id: str = Field(..., description='Unique identifier for the model')
     model_type: str = Field(..., description='Type/class of the model')
     created_at: str = Field(..., description='Timestamp when model was created')
-    hyperparameters: Dict[str, Any] = Field(default_factory=dict, description='Model hyperparameters')
+    hyperparameters: dict[str, Any] = Field(default_factory=dict, description='Model hyperparameters')
 
 
-class BaseModel(ABC):
+class BaseMLModel(ABC):
     """Base class for all ML models in the service."""
 
     @abstractmethod
@@ -26,11 +35,11 @@ class BaseModel(ABC):
         """Make predictions using the model."""
 
     @abstractmethod
-    def get_hyperparameters(self) -> Dict[str, Any]:
+    def get_hyperparameters(self) -> dict[str, Any]:
         """Get model hyperparameters."""
 
     @abstractmethod
-    def set_hyperparameters(self, params: Dict[str, Any]) -> None:
+    def set_hyperparameters(self, params: dict[str, Any]) -> None:
         """Set model hyperparameters."""
 
 
@@ -38,9 +47,9 @@ class ModelRegistry:
     """Registry for managing ML models."""
 
     def __init__(self, storage_path: Path):
-        self.storage_path = storage_path
+        self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
-        self._models: Dict[str, ModelMetadata] = {}
+        self._models: dict[str, ModelMetadata] = {}
         self._load_existing_models()
 
     def _load_existing_models(self) -> None:
@@ -52,7 +61,7 @@ class ModelRegistry:
             except Exception as e:
                 logger.error(f'Failed to load model metadata {model_path}: {e!s}')
 
-    def save_model(self, model_id: str, model: BaseModel, metadata: ModelMetadata) -> None:
+    def save_model(self, model_id: str, model: BaseMLModel, metadata: ModelMetadata) -> None:
         """Save model and its metadata to storage."""
         try:
             model_path = self.storage_path / f'{model_id}.joblib'
@@ -67,7 +76,7 @@ class ModelRegistry:
             logger.error(f'Failed to save model {model_id}: {e!s}')
             raise
 
-    def load_model(self, model_id: str) -> Optional[BaseModel]:
+    def get_model(self, model_id: str) -> Optional[BaseMLModel]:
         """Load model from storage."""
         try:
             model_path = self.storage_path / f'{model_id}.joblib'
@@ -102,6 +111,6 @@ class ModelRegistry:
             logger.error(f'Failed to delete model {model_id}: {e!s}')
             raise
 
-    def list_models(self) -> List[ModelMetadata]:
+    def list_models(self) -> list[ModelMetadata]:
         """List all available models."""
         return list(self._models.values())

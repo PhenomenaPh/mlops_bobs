@@ -1,14 +1,15 @@
-"""Implementation of LR AND RF ML models."""
+"""Implementation of specific ML models."""
+from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict
 
 import numpy as np
 from loguru import logger
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 
-from .models import BaseModel, ModelMetadata
+from .models import BaseMLModel, ModelMetadata  # Updated import
 
 
 class SklearnModelMixin:
@@ -26,12 +27,54 @@ class SklearnModelMixin:
             raise ValueError(f'Input data must be 2-dimensional, got shape {X.shape}')
 
 
-class LinearRegressionModel(SklearnModelMixin, BaseModel):
+class LinearRegressionModel(SklearnModelMixin, BaseMLModel):
     """Linear Regression model implementation."""
 
     def __init__(self):
         self.model = LinearRegression()
-        self._hyperparameters = {'fit_intercept': True, 'copy_X': True, 'n_jobs': None, 'positive': False}
+        self._hyperparameters = {
+            'fit_intercept': True,
+            'copy_X': True,
+            'n_jobs': None,
+            'positive': False
+        }
+
+    def train(self, X: Any, y: Any, **kwargs) -> None:
+        """Train the linear regression model."""
+        self._validate_input(X, "training")
+
+        try:
+            logger.info("Training LinearRegression model...")
+            self.model.set_params(**self._hyperparameters)
+            self.model.fit(X, y)
+            logger.info("Model training completed successfully")
+        except Exception as e:
+            logger.error(f"Failed to train model: {str(e)}")
+            raise
+
+    def predict(self, X: Any) -> np.ndarray:
+        """Make predictions using the trained model."""
+        self._validate_input(X, "prediction")
+
+        try:
+            logger.debug("Making predictions with LinearRegression model...")
+            return self.model.predict(X)
+        except Exception as e:
+            logger.error(f"Failed to make predictions: {str(e)}")
+            raise
+
+    def get_hyperparameters(self) -> Dict[str, Any]:
+        """Get current hyperparameters."""
+        return self._hyperparameters.copy()
+
+    def set_hyperparameters(self, params: Dict[str, Any]) -> None:
+        """Set model hyperparameters."""
+        valid_params = {
+            k: v for k, v in params.items()
+            if k in self._hyperparameters
+        }
+        self._hyperparameters.update(valid_params)
+        logger.info(f"Updated hyperparameters: {valid_params}")
 
     @classmethod
     def create(cls, model_id: str, **kwargs) -> tuple[LinearRegressionModel, ModelMetadata]:
@@ -41,49 +84,15 @@ class LinearRegressionModel(SklearnModelMixin, BaseModel):
 
         metadata = ModelMetadata(
             model_id=model_id,
-            model_type='LinearRegression',
+            model_type="LinearRegression",
             created_at=datetime.utcnow().isoformat(),
-            hyperparameters=model._hyperparameters,
+            hyperparameters=model._hyperparameters
         )
 
         return model, metadata
 
-    def train(self, X: Any, y: Any, **kwargs) -> None:
-        """Train the linear regression model."""
-        self._validate_input(X, 'training')
 
-        try:
-            logger.info('Training LinearRegression model...')
-            self.model.set_params(**self._hyperparameters)
-            self.model.fit(X, y)
-            logger.info('Model training completed successfully')
-        except Exception as e:
-            logger.error(f'Failed to train model: {e!s}')
-            raise
-
-    def predict(self, X: Any) -> np.ndarray:
-        """Make predictions using the trained model."""
-        self._validate_input(X, 'prediction')
-
-        try:
-            logger.debug('Making predictions with LinearRegression model...')
-            return self.model.predict(X)
-        except Exception as e:
-            logger.error(f'Failed to make predictions: {e!s}')
-            raise
-
-    def get_hyperparameters(self) -> dict[str, Any]:
-        """Get current hyperparameters."""
-        return self._hyperparameters.copy()
-
-    def set_hyperparameters(self, params: dict[str, Any]) -> None:
-        """Set model hyperparameters."""
-        valid_params = {k: v for k, v in params.items() if k in self._hyperparameters}
-        self._hyperparameters.update(valid_params)
-        logger.info(f'Updated hyperparameters: {valid_params}')
-
-
-class RandomForestModel(SklearnModelMixin, BaseModel):
+class RandomForestModel(SklearnModelMixin, BaseMLModel):
     """Random Forest model implementation."""
 
     def __init__(self):
@@ -93,8 +102,9 @@ class RandomForestModel(SklearnModelMixin, BaseModel):
             'max_depth': None,
             'min_samples_split': 2,
             'min_samples_leaf': 1,
-            'max_features': 'auto',
+            'max_features': 'sqrt',
             'random_state': None,
+            'n_jobs': None
         }
 
     @classmethod
@@ -105,9 +115,9 @@ class RandomForestModel(SklearnModelMixin, BaseModel):
 
         metadata = ModelMetadata(
             model_id=model_id,
-            model_type='RandomForest',
+            model_type="RandomForest",
             created_at=datetime.utcnow().isoformat(),
-            hyperparameters=model._hyperparameters,
+            hyperparameters=model._hyperparameters
         )
 
         return model, metadata
@@ -142,6 +152,9 @@ class RandomForestModel(SklearnModelMixin, BaseModel):
 
     def set_hyperparameters(self, params: dict[str, Any]) -> None:
         """Set model hyperparameters."""
-        valid_params = {k: v for k, v in params.items() if k in self._hyperparameters}
+        valid_params = {
+            k: v for k, v in params.items()
+            if k in self._hyperparameters
+        }
         self._hyperparameters.update(valid_params)
         logger.info(f'Updated hyperparameters: {valid_params}')
