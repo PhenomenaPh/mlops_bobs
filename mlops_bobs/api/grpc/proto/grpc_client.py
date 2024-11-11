@@ -1,7 +1,8 @@
 import grpc
 import os
 import pandas as pd
-from proto import service_pb2, service_pb2_grpc
+import service_pb2
+import service_pb2_grpc
 
 
 def load_data(file_path):
@@ -25,7 +26,6 @@ def load_data(file_path):
     ]
 
     return training_data, target.tolist()
-
 
 def run():
     with grpc.insecure_channel('localhost:50051') as channel:

@@ -1,10 +1,10 @@
 from concurrent import futures
 import grpc
 import uuid
-from proto import service_pb2, service_pb2_grpc
+import service_pb2
+import service_pb2_grpc
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +19,7 @@ class ModelService(service_pb2_grpc.ModelServiceServicer):
             model = LinearRegression()
         elif request.model_type == "random_forest":
             n_estimators = int(request.hyperparameters.get("n_estimators", 100))
-            max_depth = int(request.hyperparameters.get("max_depth", None))
+            max_depth = int(request.hyperparameters.get("max_depth", None)) if request.hyperparameters.get("max_depth") else None
             model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth)
         else:
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -35,16 +35,13 @@ class ModelService(service_pb2_grpc.ModelServiceServicer):
         models_store[model_id] = model
         return service_pb2.TrainResponse(model_id=model_id)
 
-
     def Predict(self, request, context):
-        # Проверка наличия модели
         model = models_store.get(request.model_id)
         if model is None:
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details("Model not found")
             return service_pb2.PredictResponse()
 
-        # Преобразование данных и выполнение предсказания
         X = [row.features for row in request.data]
         predictions = model.predict(X)
 
