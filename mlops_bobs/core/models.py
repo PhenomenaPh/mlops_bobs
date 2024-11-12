@@ -18,6 +18,7 @@ class ModelMetadata(PydanticBaseModel):
     )
 
     model_id: str = Field(..., description='Unique identifier for the model')
+    model_name: str = Field(..., description='Human-readable name provided by the client')
     model_type: str = Field(..., description='Type/class of the model')
     created_at: str = Field(..., description='Timestamp when model was created')
     hyperparameters: dict[str, Any] = Field(default_factory=dict, description='Model hyperparameters')
@@ -64,16 +65,26 @@ class ModelRegistry:
     def save_model(self, model_id: str, model: BaseMLModel, metadata: ModelMetadata) -> None:
         """Save model and its metadata to storage."""
         try:
-            model_path = self.storage_path / f'{model_id}.joblib'
-            metadata_path = self.storage_path / f'{model_id}.meta'
+            existing_model_id = None
+            for model_id, meta in self._models.items():
+                if meta.model_name == metadata.model_name:
+                    existing_model_id = model_id
+                    break
+
+            if existing_model_id:
+                logger.info(f'Overriding existing model with client-provided name {metadata.model_name}')
+                metadata.model_id = existing_model_id
+
+            model_path = self.storage_path / f'{metadata.model_id}.joblib'
+            metadata_path = self.storage_path / f'{metadata.model_id}.meta'
 
             joblib.dump(model, model_path)
             joblib.dump(metadata, metadata_path)
 
-            self._models[model_id] = metadata
-            logger.info(f'Successfully saved model {model_id}')
+            self._models[metadata.model_id] = metadata
+            logger.info(f'Successfully saved model {metadata.model_id} with client name {metadata.model_name}')
         except Exception as e:
-            logger.error(f'Failed to save model {model_id}: {e!s}')
+            logger.error(f'Failed to save model {metadata.model_id}: {e!s}')
             raise
 
     def get_model(self, model_id: str) -> Optional[BaseMLModel]:

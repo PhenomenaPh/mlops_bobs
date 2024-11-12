@@ -77,13 +77,14 @@ class LinearRegressionModel(SklearnModelMixin, BaseMLModel):
         logger.info(f"Updated hyperparameters: {valid_params}")
 
     @classmethod
-    def create(cls, model_id: str, **kwargs) -> tuple[LinearRegressionModel, ModelMetadata]:
+    def create(cls, model_id: str, model_name: str, **kwargs) -> tuple[LinearRegressionModel, ModelMetadata]:
         """Create a new model instance with metadata."""
         model = cls()
         model.set_hyperparameters(kwargs)
 
         metadata = ModelMetadata(
             model_id=model_id,
+            model_name=model_name,
             model_type="LinearRegression",
             created_at=datetime.utcnow().isoformat(),
             hyperparameters=model._hyperparameters
@@ -108,13 +109,14 @@ class RandomForestModel(SklearnModelMixin, BaseMLModel):
         }
 
     @classmethod
-    def create(cls, model_id: str, **kwargs) -> tuple[RandomForestModel, ModelMetadata]:
+    def create(cls, model_id: str, model_name: str, **kwargs) -> tuple[RandomForestModel, ModelMetadata]:
         """Create a new model instance with metadata."""
         model = cls()
         model.set_hyperparameters(kwargs)
 
         metadata = ModelMetadata(
             model_id=model_id,
+            model_name=model_name,
             model_type="RandomForest",
             created_at=datetime.utcnow().isoformat(),
             hyperparameters=model._hyperparameters

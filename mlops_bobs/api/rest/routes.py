@@ -45,6 +45,7 @@ async def create_model(request: schemas.ModelCreate) -> schemas.ModelResponse:
         try:
             model, metadata = model_class.create(
                 model_id=model_id,
+                model_name=request.model_name,
                 **(request.hyperparameters or {})
             )
         except Exception as e:
@@ -53,11 +54,12 @@ async def create_model(request: schemas.ModelCreate) -> schemas.ModelResponse:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'Failed to create model instance: {e!s}'
             )
-
+        
         model_registry.save_model(model_id, model, metadata)
 
         return schemas.ModelResponse(
             model_id=metadata.model_id,
+            model_name=metadata.model_name,
             model_type=metadata.model_type,
             created_at=metadata.created_at,
             hyperparameters=metadata.hyperparameters
@@ -127,6 +129,7 @@ async def list_models() -> list[schemas.ModelResponse]:
         return [
             schemas.ModelResponse(
                 model_id=model.model_id,
+                model_name=model.model_name,
                 model_type=model.model_type,
                 created_at=model.created_at,
                 hyperparameters=model.hyperparameters
