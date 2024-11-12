@@ -20,6 +20,7 @@ class TrainingData(BaseSchema):
 
 class ModelCreate(BaseSchema):
     """Schema for model creation request."""
+    model_name: str = Field(..., description='Human-readable name provided by the client')
     model_type: str = Field(..., description="Type of model to create (e.g., 'LinearRegression', 'RandomForest')")
     hyperparameters: Optional[dict[str, Any]] = Field(
         default=None,
@@ -30,6 +31,7 @@ class ModelCreate(BaseSchema):
 class ModelResponse(BaseSchema):
     """Schema for model information response."""
     model_id: str = Field(..., description='Unique identifier for the model')
+    model_name: str = Field(..., description='Human-readable name provided by the client')
     model_type: str = Field(..., description='Type of model')
     created_at: str = Field(..., description='Timestamp of model creation')
     hyperparameters: dict[str, Any] = Field(..., description='Model hyperparameters')

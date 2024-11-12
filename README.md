@@ -8,10 +8,10 @@ A service for managing and using ML models with both REST and gRPC APIs. This se
 - Support for multiple ML model types
 - Model lifecycle management (create, train, predict, delete)
 - Hyperparameter customization
-- Interactive dashboard (coming soon)
+- Interactive dashboard (Predict & Test coming soon)
 - Comprehensive logging
 - Swagger documentation
-- Authentication support (coming soon)
+- Authentication support
 
 ## Supported Models
 
@@ -24,16 +24,18 @@ Each model type supports its own set of hyperparameters that can be customized d
 ## Project Structure
 
 ```
-ml-service/
+mlops_bobs/
 ├── src/
-│   └── ml_service/      
+│   └── mlops_bobs/      
 │       ├── api/         # API implementations
 │       │   ├── rest/    # REST API endpoints
 │       │   └── grpc/    # gRPC service
 │       ├── core/        # Core business logic
 │       ├── config/      # Configuration
 │       └── utils/       # Utility functions
+├── dashboard/           # Streamlit dashboard
 ├── tests/               # Test files
+├── sample_data/         # Sample datasets
 ├── scripts/             # Utility scripts
 ├── poetry.lock         
 └── pyproject.toml      
@@ -68,6 +70,17 @@ poetry run python scripts/start_rest.py
 ```
 http://localhost:8000/docs
 ```
+
+## Running the Dashboard
+
+1.  Start the Streamlit Dashboard:
+```bash
+streamlit run dashboard/streamlit_dashboard.py
+```
+
+2.  Log In the Dashboard
+- username = `hse_mlops_2024`
+- password = `strong_password`
 
 ## API Usage
 
