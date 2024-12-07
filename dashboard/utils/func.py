@@ -4,10 +4,12 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import datetime as dt
+import matplotlib.pyplot as plt
 
 from requests.auth import HTTPBasicAuth
 from st_aggrid import AgGrid, GridOptionsBuilder
 from time import sleep
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
 
@@ -179,9 +181,15 @@ def view_models_hyperparams(selected_models: list):
     - Для этих моделей выводит гиперпараметры по группам моделей
     """
     
-    if len(selected_models) == 0:
-        return
-    else:
+    try:
+
+        if len(selected_models) == 0:
+            return
+        
+        else:
+            models_df = get_models()
+
+    except TypeError:
         models_df = get_models()
 
     if models_df.shape[0] > 0 and selected_models is None:
@@ -450,22 +458,26 @@ def create_and_train(features: list, targets: list):
                 train_model(model_id=model_id, model_name=create_data["model_name"], data=train_data)
 
 
-def delete_model(selected_models):
+def delete_model(selected_models: list):
     """
-    Функция для удаления выбранных моделей
+    Функция для удаления выбранных клиентом моделей
 
     - Принимает выбранные клиентом модели
-    - Для каждой из этих моделей дергает ручку API сервера, которая удаляет модель
+    - Для каждой из моделей дергает ручку API сервера, которая удаляет модель
     """
 
-    if len(selected_models) == 0:
-        st.warning("There are no models to delete yet.")
+    try:
+
+        if len(selected_models) == 0:
+            st.warning("There are no models to delete yet.")
+            return
+        
+        else:
+            st.write("Press the button below to delete selected model(s)")
+    
+    except TypeError:
+        st.write("""*Select model(s) in the table above you want to delete*""")
         return
-    elif selected_models is None:
-        st.write("""*Select models in the table above you want to delete*""")
-        return
-    else:
-        st.write("Press the button below to delete selected model(s)")
     
     if "delete_model_pending" not in st.session_state:
         st.session_state.delete_model_pending = False
@@ -474,7 +486,7 @@ def delete_model(selected_models):
         
         st.session_state.delete_model_pending = True
 
-        st.write(f"Following model(s): [{', '.join(selected_models['Model Name'])}] will be deleted forever")
+        st.write(f"""Following model(s): ***{', '.join(selected_models['Model Name'])}*** will be deleted forever""")
         if st.button("Confirm Delete"):
             
             for model_id in selected_models["Model ID"].values.tolist():
@@ -489,3 +501,180 @@ def delete_model(selected_models):
             
             st.session_state.delete_model_pending = False
             st.rerun()
+
+
+def check_predict_test_df(df: pd.DataFrame, target: bool):
+    """
+    Функция для проверки загруженного predict/test датасета и его форматирования
+
+    - Если клиент указал, что датасет содержит таргет, проверяет, что в нем также есть хотя бы одна фича
+    - Если клиент указал, что датасет содержит таргет, берет последний столбец датасета в качестве таргета
+    - Выводит справочную информацию о датасете, чтобы клиент убедился, что данные считаны верно
+    - Возвращает отформатированные фичи, таргет (при наличии) и булево значение, отражающее результат проверки
+    """
+
+    if df is None:
+        return None, None, False
+    
+    elif target and df.shape[1] < 2:
+        st.error(f"Your dataframe has only 1 column. Must include at least 1 Feature and a Target.")
+        st.warning("If you don't have a Target in your data, use the toggle above to pass. You will not be able to test model(s).")
+        return None, None, False
+    
+    elif target:
+
+        st.warning("Please note that the last column will be treated as Target.")
+        
+        st.write(f"Test set shape: {df.shape[0]} rows, {df.shape[1]} columns")
+        st.write(f"""- Target: `{df.columns[-1]}`\n- {df.shape[1]-1} Feature(s): `{', '.join(df.columns[:-1])}`""")
+        st.write("Your test set:")
+        st.dataframe(df, height=210)
+
+        return df.iloc[:, :-1].values.tolist(), df.iloc[:, -1].values.tolist(), True
+    
+    else:
+
+        st.warning("You will be able to predict only as you don't have a Target in your dataset.")
+        
+        st.write(f"Predict set shape: {df.shape[0]} rows, {df.shape[1]} columns")
+        st.write(f"""- {df.shape[1]} Feature(s): `{', '.join(df.columns)}`""")
+        st.write("Your predict set:")
+        st.dataframe(df, height=210)
+
+        return df.values.tolist(), None, True
+
+
+def predict_model(model_id: str, model_name: str, data: dict) -> pd.DataFrame:
+    """
+    Функция для получения предсказаний конкретной обученной модели
+
+    - Дергает ручку API сервера, которая возвращает предсказания обученной модели
+    """
+
+    response = requests.post(f"{API_BASE_URL}/models/{model_id}/predict", json=data, auth=HTTPBasicAuth(USERNAME, PASSWORD))
+    
+    if response.status_code == 200:
+        st.success(f"""Model ***{model_name}*** successfully returned predictions.""")
+        df = pd.DataFrame(response.json())
+        df.columns = [f"{model_name}_pred"]
+        return df
+    
+    elif response.status_code == 500:
+        st.error(f"""Model ***{model_name}*** is expecting another number of Features as input.""")
+        return None
+
+    else:
+        st.error(f"Error getting predictions. Response: {response.status_code}.")
+        return None
+
+
+def predict(selected_models: list, features: list, df: pd.DataFrame) -> list:
+    """
+    Функция для получения предсказаний выбранных клиентом моделей
+
+    - Принимает выбранные клиентом модели, фичи и загруженный клиентом predict/test датасет
+    - Для каждой из моделей дергает ручку API сервера, которая возвращает ее предсказания
+    - Добавляет к загруженному клиентом датасету подписанные столбцы с предсказаниями выбранных им моделей
+    """
+    
+    if selected_models is not None:
+            
+        st.write(f"""Selected model(s): ***{', '.join(selected_models["Model Name"])}***""")
+            
+        if st.button("Predict"):
+                
+            predictions = []
+            for id, name in zip(selected_models["Model ID"], selected_models["Model Name"]):
+                    
+                data = {"features": features}
+                    
+                pred = predict_model(model_id=id, model_name=name, data=data)
+                if pred is not None:
+                    predictions.append(pred)
+                    
+            predictions = pd.concat(predictions, axis=1)
+            result = pd.concat([df, predictions], axis=1)
+                
+            st.write("Your predictions:")
+            st.dataframe(result, height=210)
+
+            return predictions
+        
+        else:
+            return None
+    
+    else:
+        st.write("""*Select model(s) you want to use in the **[Trained models](#trained-models)** section above*""")
+        return None
+
+
+def plot_test_scatter(targets: list, predictions: pd.DataFrame):
+    """
+    Функция для построения графика, показывающего соотношение истинных и предсказанных значений для выбранных клиентом моделей
+
+    - Принимает список истинных значений и датафрейм предсказанных значений, который возвращает функция predict
+    - Отбирает случайные 300 наблюдений, чтобы не перегрузить график точками
+    - Строит scatterplot, где по оси Х отражено истинное значение наблюдения, а по оси Y отражено предсказанное для него значение
+    """
+    
+    targets = pd.DataFrame(targets).sample(300)
+    predictions = predictions.loc[targets.index]
+    
+    plt.figure(figsize=(7, 7))
+
+    # Линия идеально точных предсказаний
+    plt.plot(
+        targets,
+        targets,
+        color="black",
+        linestyle=(0, (5, 5)),
+        linewidth=1,
+        label="Ideal (y = x)"
+    )
+
+    for column in predictions.columns:
+        plt.scatter(
+            targets,
+            predictions[column],
+            label=column[:-5],
+            alpha=0.25,
+            zorder=3
+        )
+    
+    plt.xlabel("True Target Values")
+    plt.ylabel("Predicted Target Values")
+    plt.legend()
+    plt.grid(True)
+
+    st.pyplot(plt)
+
+
+def test(targets: list, predictions: pd.DataFrame):
+    """
+    Функция для просмотра метрик качества выбранных моделей
+
+    - Принимает список истинных значений и датафрейм предсказанных значений, который возвращает функция predict
+    - Для каждой модели считает метрики качества (MAE, RMSE) и выводит сводную таблицу с результатами
+    - Строит график, показывающий соотношение истинных и предсказанных значений, при помощи функции plot_test_scatter
+    """
+
+    if targets is None:
+        st.error("Error getting Target. Please try loading your test set again.")
+    
+    elif predictions is None:
+        st.error("Error getting Predictions. Please select some [models](#trained-models) and make Predictions with them first.")
+    
+    else:
+
+        test = pd.DataFrame(columns=["MAE", "RMSE"])
+
+        for i, model in enumerate([i[:-5] for i in predictions.columns]):
+
+            test.loc[model, "MAE"] = mean_absolute_error(targets, predictions.iloc[:, i])
+            test.loc[model, "RMSE"] = np.sqrt(mean_squared_error(targets, predictions.iloc[:, i]))
+
+        st.write("Comparison Table of Quality Metrics for Selected Models")
+        st.dataframe(test)
+        st.write("Scatter Plot of True vs Predicted Values by Selected Models")
+        st.write("""*(Random 300 observations were picked to prevent overloading the graph)*""")
+        plot_test_scatter(targets, predictions)

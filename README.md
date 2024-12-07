@@ -8,7 +8,7 @@ A service for managing and using ML models with both REST and gRPC APIs. This se
 - Support for multiple ML model types
 - Model lifecycle management (create, train, predict, delete)
 - Hyperparameter customization
-- Interactive dashboard (Predict & Test coming soon)
+- Interactive dashboard
 - Comprehensive logging
 - Swagger documentation
 - Authentication support
