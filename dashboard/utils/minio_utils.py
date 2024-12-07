@@ -1,11 +1,14 @@
 import os
+
+import pandas as pd
+
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
-import pandas as pd
-
 from . import dvc_utils
+
+
 
 # MinIO client configuration
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
@@ -13,11 +16,14 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "datasets")
 
+
+
 # Initialize DVC storage
 dvc_storage = dvc_utils.DVCStorage()
 
 
-def save_dataframe_to_minio(df: pd.DataFrame, filename: str | None = None) -> str:
+
+def save_dataframe_to_minio(df: pd.DataFrame, filename: str) -> str:
     """
     Save a pandas DataFrame using DVC with MinIO as remote storage.
 
@@ -28,16 +34,14 @@ def save_dataframe_to_minio(df: pd.DataFrame, filename: str | None = None) -> st
     Returns:
         str: The name of the saved dataset
     """
-    if filename is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"dataset_{timestamp}"
-    else:
-        # Remove .csv extension if present
-        filename = Path(filename).stem
+    
+    # Remove .csv extension if present
+    filename = Path(filename).stem
 
     # Save using DVC
     file_path = dvc_storage.add_dataset(df, filename)
-    return Path(file_path).stem
+    
+    return Path(file_path)
 
 
 def get_dataframe_from_minio(dataset_name: str) -> pd.DataFrame:
@@ -65,19 +69,21 @@ def list_datasets() -> list[dict]:
     Returns:
         List[Dict]: A list of dictionaries containing dataset information
     """
+    
     datasets = dvc_storage.list_datasets()
 
     # Format the response to match the expected schema
-    return [
-        {
-            "dataset_name": dataset["name"],
-            "size": Path(dataset["path"]).stat().st_size,
-            "last_modified": datetime.fromtimestamp(
-                Path(dataset["path"]).stat().st_mtime
-            ).isoformat(),
-        }
-        for dataset in datasets
-    ]
+    return datasets
+    # return [
+    #     {
+    #         "dataset_name": dataset["name"],
+    #         "size": Path(dataset["path"]).stat().st_size,
+    #         "last_modified": datetime.fromtimestamp(
+    #             Path(dataset["path"]).stat().st_mtime
+    #         ).isoformat(),
+    #     }
+    #     for dataset in datasets
+    # ]
 
 
 def format_dataset_for_training(
