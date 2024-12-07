@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Optional
 
-from dvc.config import Config
 from dvc.repo import Repo
 
 from . import minio_utils
@@ -14,32 +13,18 @@ class DVCStorage:
 
     def _configure_remote(self):
         """Configure MinIO as a DVC remote"""
-        # Configure MinIO remote
-        self.repo.config.set(
-            "remote.minio.url",
-            f"s3://{minio_utils.MINIO_BUCKET}",
-            level=Config.LEVEL_REPO,
-        )
-
-        # Set MinIO credentials and endpoint
-        self.repo.config.set(
-            "remote.minio.endpointurl",
-            f"http://{minio_utils.MINIO_ENDPOINT}",
-            level=Config.LEVEL_REPO,
-        )
-        self.repo.config.set(
-            "remote.minio.access_key_id",
-            minio_utils.MINIO_ACCESS_KEY,
-            level=Config.LEVEL_REPO,
-        )
-        self.repo.config.set(
-            "remote.minio.secret_access_key",
-            minio_utils.MINIO_SECRET_KEY,
-            level=Config.LEVEL_REPO,
-        )
+        # Configure MinIO remote using the config API
+        self.repo.config["remote.minio.url"] = f"s3://{minio_utils.MINIO_BUCKET}"
+        self.repo.config[
+            "remote.minio.endpointurl"
+        ] = f"http://{minio_utils.MINIO_ENDPOINT}"
+        self.repo.config["remote.minio.access_key_id"] = minio_utils.MINIO_ACCESS_KEY
+        self.repo.config[
+            "remote.minio.secret_access_key"
+        ] = minio_utils.MINIO_SECRET_KEY
 
         # Set as default remote
-        self.repo.config.set("core.remote", "minio", level=Config.LEVEL_REPO)
+        self.repo.config["core.remote"] = "minio"
 
     def add_dataset(self, df, name: str) -> str:
         """
@@ -101,13 +86,14 @@ class DVCStorage:
             for file in data_dir.glob("*.csv"):
                 if (file.parent / (file.name + ".dvc")).exists():
                     # Get DVC file info
-                    dvc_info = self.repo.status([str(file)])[str(file)]
+                    try:
+                        dvc_info = self.repo.status([str(file)])
+                        status = dvc_info.get(str(file), {}).get("status", "unknown")
+                    except:
+                        status = "unknown"
+
                     datasets.append(
-                        {
-                            "name": file.stem,
-                            "path": str(file),
-                            "status": dvc_info["status"] if dvc_info else "unknown",
-                        }
+                        {"name": file.stem, "path": str(file), "status": status}
                     )
 
-        return datasets
+            return datasets
