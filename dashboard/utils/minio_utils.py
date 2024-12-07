@@ -1,10 +1,11 @@
-import io
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import List, Tuple
 
 import pandas as pd
-from minio import Minio
+
+from . import dvc_utils
 
 # MinIO client configuration
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
@@ -12,108 +13,71 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "datasets")
 
-
-def get_minio_client():
-    """Create and return a MinIO client instance."""
-    return Minio(
-        MINIO_ENDPOINT,
-        access_key=MINIO_ACCESS_KEY,
-        secret_key=MINIO_SECRET_KEY,
-        secure=False,  # Set to True if using HTTPS
-    )
-
-
-def ensure_bucket_exists(client):
-    """Ensure the bucket exists, create if it doesn't."""
-    if not client.bucket_exists(MINIO_BUCKET):
-        client.make_bucket(MINIO_BUCKET)
+# Initialize DVC storage
+dvc_storage = dvc_utils.DVCStorage()
 
 
 def save_dataframe_to_minio(df: pd.DataFrame, filename: str | None = None) -> str:
     """
-    Save a pandas DataFrame to MinIO as a CSV file.
+    Save a pandas DataFrame using DVC with MinIO as remote storage.
 
     Args:
         df: The pandas DataFrame to save
         filename: Optional custom filename, if not provided will generate one
 
     Returns:
-        str: The object name (path) in MinIO where the file was saved
+        str: The name of the saved dataset
     """
     if filename is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"dataset_{timestamp}.csv"
+        filename = f"dataset_{timestamp}"
+    else:
+        # Remove .csv extension if present
+        filename = Path(filename).stem
 
-    # Convert DataFrame to CSV bytes
-    csv_bytes = df.to_csv(index=False).encode("utf-8")
-    csv_buffer = io.BytesIO(csv_bytes)
-
-    client = get_minio_client()
-    ensure_bucket_exists(client)
-
-    # Upload the file to MinIO
-    client.put_object(
-        bucket_name=MINIO_BUCKET,
-        object_name=filename,
-        data=csv_buffer,
-        length=len(csv_bytes),
-        content_type="text/csv",
-    )
-
-    return filename
+    # Save using DVC
+    file_path = dvc_storage.add_dataset(df, filename)
+    return Path(file_path).stem
 
 
-def get_dataframe_from_minio(filename: str) -> pd.DataFrame:
+def get_dataframe_from_minio(dataset_name: str) -> pd.DataFrame:
     """
-    Retrieve a CSV file from MinIO and return it as a pandas DataFrame.
+    Retrieve a dataset using DVC.
 
     Args:
-        filename: The name of the file to retrieve
+        dataset_name: The name of the dataset to retrieve
 
     Returns:
         pd.DataFrame: The loaded DataFrame
     """
-    client = get_minio_client()
+    # Get dataset using DVC
+    file_path = dvc_storage.get_dataset(dataset_name)
+    if file_path is None:
+        raise Exception(f"Dataset {dataset_name} not found")
 
-    try:
-        # Get the object from MinIO
-        data = client.get_object(MINIO_BUCKET, filename)
-        # Read the CSV data into a DataFrame
-        return pd.read_csv(io.BytesIO(data.read()))
-    except Exception as e:
-        raise Exception(f"Error retrieving file from MinIO: {e!s}")
+    return pd.read_csv(file_path)
 
 
 def list_datasets() -> list[dict]:
     """
-    List all datasets stored in MinIO.
+    List all datasets tracked by DVC.
 
     Returns:
         List[Dict]: A list of dictionaries containing dataset information
-        Each dictionary contains:
-            - dataset_name: name of the dataset file
-            - size: size in bytes
-            - last_modified: last modification timestamp
     """
-    client = get_minio_client()
-    ensure_bucket_exists(client)
+    datasets = dvc_storage.list_datasets()
 
-    try:
-        objects = client.list_objects(MINIO_BUCKET)
-        datasets = []
-
-        for obj in objects:
-            datasets.append(
-                {
-                    "dataset_name": obj.object_name,
-                    "size": obj.size,
-                    "last_modified": obj.last_modified.isoformat(),
-                }
-            )
-
-        return datasets
-    except Exception as e:
-        raise Exception(f"Error listing datasets from MinIO: {e!s}")
+    # Format the response to match the expected schema
+    return [
+        {
+            "dataset_name": dataset["name"],
+            "size": Path(dataset["path"]).stat().st_size,
+            "last_modified": datetime.fromtimestamp(
+                Path(dataset["path"]).stat().st_mtime
+            ).isoformat(),
+        }
+        for dataset in datasets
+    ]
 
 
 def format_dataset_for_training(
