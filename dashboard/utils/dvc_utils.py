@@ -3,7 +3,6 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from dvc.config import Config
 from dvc.repo import Repo
 
 
@@ -13,7 +12,6 @@ class DVCStorage:
 
     def __init__(self):
         self.repo = Repo("./dvc")
-
 
     def add_dataset(self, df, name: str) -> str:
         """
@@ -122,4 +120,4 @@ class DVCStorage:
                             }
                         )
 
-        return datasets
+            return datasets
