@@ -44,7 +44,7 @@ def save_dataframe_to_minio(df: pd.DataFrame, filename: str) -> str:
     return Path(file_path)
 
 
-def get_dataframe_from_minio(dataset_name: str) -> pd.DataFrame:
+def get_dataframe_from_minio(dataset_name: str):
     """
     Retrieve a dataset using DVC.
 
@@ -54,12 +54,35 @@ def get_dataframe_from_minio(dataset_name: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The loaded DataFrame
     """
-    # Get dataset using DVC
-    file_path = dvc_storage.get_dataset(dataset_name)
-    if file_path is None:
-        raise Exception(f"Dataset {dataset_name} not found")
 
-    return pd.read_csv(file_path)
+    dvc_data_path = Path("dvc/data")
+    file_path = dvc_data_path / Path(f"{dataset_name}.csv")
+
+    if file_path.exists():
+        # Use cached dataset from local memory
+        pass
+    else:
+        # Pull dataset from MinIO using DVC
+        file_path = dvc_storage.get_dataset(dataset_name)
+
+    return pd.read_csv(file_path), file_path
+
+
+def remove_dataframe_from_minio(dataset_name: str) -> str:
+    """
+    Remove a dataset from MinIO using DVC.
+
+    Args:
+        dataset_name: The name of the dataset to remove
+    
+    Returns:
+        str: Path of the removed dataset
+    """
+    
+    # Remove dataset from MinIO using DVC
+    file_path = dvc_storage.remove_dataset(dataset_name)
+    
+    return file_path
 
 
 def list_datasets() -> list[dict]:
@@ -73,17 +96,17 @@ def list_datasets() -> list[dict]:
     datasets = dvc_storage.list_datasets()
 
     # Format the response to match the expected schema
-    return datasets
-    # return [
-    #     {
-    #         "dataset_name": dataset["name"],
-    #         "size": Path(dataset["path"]).stat().st_size,
-    #         "last_modified": datetime.fromtimestamp(
-    #             Path(dataset["path"]).stat().st_mtime
-    #         ).isoformat(),
-    #     }
-    #     for dataset in datasets
-    # ]
+    return [
+        {
+            "dataset_name": dataset["name"],
+            "size": Path(dataset["path"]).stat().st_size,
+            "last_modified": datetime.fromtimestamp(
+                Path(dataset["path"]).stat().st_mtime
+            ).isoformat(),
+            "status": dataset["status"],
+        }
+        for dataset in datasets
+    ]
 
 
 def format_dataset_for_training(

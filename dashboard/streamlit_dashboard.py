@@ -65,42 +65,42 @@ def main():
         """)
 
         st.markdown("""##### Storage""")
-        su.view_datasets()
+        datasets = su.view_datasets(selection="multiple")
 
         st.markdown("""##### Load & Save""")
         su.load_and_save_dataset()
+
+        st.markdown("""##### Delete""")
+        su.delete_datasets(datasets)
     
     elif section == "Create & Train Models":
+        
         st.subheader("Create & Train Models")
+        su.create_and_train_pipeline()
 
-        # Dataset loading options
-        load_option = st.radio(
-            "Choose how to load your training data:",
-            ["Upload new CSV", "Use existing dataset"],
-        )
 
-        if load_option == "Upload new CSV":
-            st.write("""**Upload a new training set...**""")
-            train_df = su.load_csv()
-            if train_df is not None:
-                features, targets, train_check = su.check_train_df(train_df)
-            else:
-                train_check = False
-                features, targets = None, None
-        else:
-            st.write("""**Select an existing dataset...**""")
-            selected_datasets = su.view_datasets()
+        # if load_option == "Upload new CSV":
+        #     st.write("""**Upload a new training set...**""")
+        #     train_df = su.load_csv()
+        #     if train_df is not None:
+        #         features, targets, train_check = su.check_train_df(train_df)
+        #     else:
+        #         train_check = False
+        #         features, targets = None, None
+        # else:
+        #     st.write("""**Select an existing dataset...**""")
+        #     selected_datasets = su.view_datasets()
 
-            if selected_datasets:
-                dataset_name = selected_datasets[0]["dataset_name"]
-                features, targets, train_check = su.get_formatted_dataset(dataset_name)
-            else:
-                train_check = False
-                features, targets = None, None
+        #     if selected_datasets:
+        #         dataset_name = selected_datasets[0]["dataset_name"]
+        #         features, targets, train_check = su.get_formatted_dataset(dataset_name)
+        #     else:
+        #         train_check = False
+        #         features, targets = None, None
 
-        if train_check:
-            st.write("""**Now let's define the model...**""")
-            su.create_and_train(features=features, targets=targets)
+        # if train_check:
+        #     st.write("""**Now let's define the model...**""")
+        #     su.create_and_train(features=features, targets=targets)
 
     elif section == "Predict & Test Models":
         st.subheader("Predict & Test Models")

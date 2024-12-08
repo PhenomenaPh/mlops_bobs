@@ -1,3 +1,5 @@
+import subprocess
+
 from pathlib import Path
 from typing import Optional
 
@@ -15,7 +17,7 @@ class DVCStorage:
 
     def add_dataset(self, df, name: str) -> str:
         """
-        Add a dataset to DVC tracking
+        Add a dataset to DVC tracking.
 
         Args:
             df: pandas DataFrame to save
@@ -43,7 +45,7 @@ class DVCStorage:
 
     def get_dataset(self, name: str) -> Optional[str]:
         """
-        Get a dataset from DVC storage
+        Get a dataset from DVC storage.
 
         Args:
             name: Name of the dataset to retrieve
@@ -54,13 +56,35 @@ class DVCStorage:
         
         file_path = Path("dvc/data") / f"{name}.csv"
 
-        try:
-            # Pull from remote
-            self.repo.pull([str(file_path)])
-            return str(file_path)
-        except Exception as e:
-            print(f"Error pulling dataset: {e}")
-            return None
+        # Pull from remote
+        self.repo.pull([str(file_path)])
+        return str(file_path)
+
+
+    def remove_dataset(self, name: str) -> str:
+        """
+        Remove a dataset and its metadata from DVC and MinIO storage.
+
+        Args:
+            name: Name of the dataset to remove
+
+        Returns:
+            str: Path of the removed dataset
+        """
+        
+        # Configure paths
+        csv_path = Path("data") / f"{name}.csv"
+        dvc_path = Path("data") / f"{name}.csv.dvc"
+        cwd = "dvc"
+
+        # Remove .dvc file with dataset metadata from local machine
+        subprocess.run(["dvc", "remove", dvc_path], cwd=cwd)
+        # Delete dataset .csv file from local machine
+        subprocess.run(["rm", "-rf", csv_path], cwd=cwd)
+        # Force garbage collection (deletion of unused files) in MinIO remote storage (cloud)
+        subprocess.run(["dvc", "gc", "-w", "-c", "--force"], cwd=cwd)
+        
+        return str(csv_path)
 
 
     def list_datasets(self) -> list[dict]:
@@ -80,17 +104,16 @@ class DVCStorage:
                 if dvc_file.exists():
                     
                     try:
-                        dvc_info = self.repo.status([str(file)])#.get(str(file), {})
+                        dvc_info = self.repo.status([str(file)]).get(str(file), {})
                         datasets.append(
                             {
                                 "name": file.stem,
                                 "path": str(file),
-                                "status": dvc_info.get("status", "unknown"),
+                                "status": dvc_info.get("status", "unchanged"),
                             }
                         )
-                        print("Success!")
+
                     except KeyError:
-                        print(f"File not tracked by DVC: {file}")
                         datasets.append(
                             {
                                 "name": file.stem,
@@ -98,7 +121,5 @@ class DVCStorage:
                                 "status": "not tracked",
                             }
                         )
-                else:
-                    print(f"No DVC file found for: {file}")
 
-        return dvc_info #datasets
+        return datasets

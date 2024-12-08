@@ -128,7 +128,7 @@ def get_models() -> pd.DataFrame:
             return
         
         models_df = pd.DataFrame(models)
-        models_df.created_at = (pd.to_datetime(models_df.created_at) + dt.timedelta(hours=3)).dt.strftime('(MSK) %Y-%m-%d %H:%M:%S')
+        models_df.created_at = (pd.to_datetime(models_df.created_at) + dt.timedelta(hours=3)).dt.strftime("(MSK) %Y-%m-%d %H:%M:%S")
         models_df.columns = [
             "Model ID",
             "Model Name",
@@ -200,16 +200,16 @@ def view_models_hyperparams(selected_models: list):
     
     elif models_df.shape[0] > 0:
         
-        lin_reg = selected_models[selected_models['Model Type'] == 'LinearRegression']
-        forest = selected_models[selected_models['Model Type'] == 'RandomForest']
+        lin_reg = selected_models[selected_models["Model Type"] == "LinearRegression"]
+        forest = selected_models[selected_models["Model Type"] == "RandomForest"]
             
         if lin_reg.shape[0] > 0:
                 
             st.write("LinearRegression")
             lin_reg_hp_df = pd.concat(
                 [
-                    lin_reg['Model Name'],
-                    lin_reg['Hyperparameters'].apply(lambda x: pd.Series(x))
+                    lin_reg["Model Name"],
+                    lin_reg["Hyperparameters"].apply(lambda x: pd.Series(x))
                 ],
                 axis=1
             )
@@ -220,8 +220,8 @@ def view_models_hyperparams(selected_models: list):
             st.write("RandomForest")
             forest_hp_df = pd.concat(
                 [
-                    forest['Model Name'],
-                    forest['Hyperparameters'].apply(lambda x: pd.Series(x))
+                    forest["Model Name"],
+                    forest["Hyperparameters"].apply(lambda x: pd.Series(x))
                 ],
                 axis=1
             )
@@ -286,7 +286,7 @@ def check_train_df(df: pd.DataFrame):
         st.warning("Please note that the last column will be treated as Target.")
         
         st.write(f"Train set shape: {df.shape[0]} rows, {df.shape[1]} columns")
-        st.write(f"""- Target: `{df.columns[-1]}`\n- {df.shape[1]-1} Feature(s): `{', '.join(df.columns[:-1])}`""")
+        st.write(f"""- Target: `{df.columns[-1]}`\n- {df.shape[1]-1} Feature(s): `{", ".join(df.columns[:-1])}`""")
         st.write("Your train set:")
         st.dataframe(df, height=210)
 
@@ -409,7 +409,7 @@ def create_and_train(features: list, targets: list):
         )
         max_features = st.selectbox(
             """Max Features | *The number of features to consider when looking for the best split.*""",
-            ["sqrt", 'log2']
+            ["sqrt", "log2"]
         )
         random_state = st.number_input(
             """Random State | *For reproductive results.*""",
@@ -489,7 +489,7 @@ def delete_model(selected_models: list):
         
         st.session_state.delete_model_pending = True
 
-        st.write(f"""Following model(s): ***{', '.join(selected_models['Model Name'])}*** will be deleted forever""")
+        st.write(f"""Following model(s): ***{", ".join(selected_models["Model Name"])}*** will be deleted forever""")
         if st.button("Confirm Delete"):
             
             for model_id in selected_models["Model ID"].values.tolist():
@@ -529,7 +529,7 @@ def check_predict_test_df(df: pd.DataFrame, target: bool):
         st.warning("Please note that the last column will be treated as Target.")
         
         st.write(f"Test set shape: {df.shape[0]} rows, {df.shape[1]} columns")
-        st.write(f"""- Target: `{df.columns[-1]}`\n- {df.shape[1]-1} Feature(s): `{', '.join(df.columns[:-1])}`""")
+        st.write(f"""- Target: `{df.columns[-1]}`\n- {df.shape[1]-1} Feature(s): `{", ".join(df.columns[:-1])}`""")
         st.write("Your test set:")
         st.dataframe(df, height=210)
 
@@ -540,7 +540,7 @@ def check_predict_test_df(df: pd.DataFrame, target: bool):
         st.warning("You will be able to predict only as you don't have a Target in your dataset.")
         
         st.write(f"Predict set shape: {df.shape[0]} rows, {df.shape[1]} columns")
-        st.write(f"""- {df.shape[1]} Feature(s): `{', '.join(df.columns)}`""")
+        st.write(f"""- {df.shape[1]} Feature(s): `{", ".join(df.columns)}`""")
         st.write("Your predict set:")
         st.dataframe(df, height=210)
 
@@ -582,7 +582,7 @@ def predict(selected_models: list, features: list, df: pd.DataFrame) -> list:
     
     if selected_models is not None:
             
-        st.write(f"""Selected model(s): ***{', '.join(selected_models["Model Name"])}***""")
+        st.write(f"""Selected model(s): ***{", ".join(selected_models["Model Name"])}***""")
             
         if st.button("Predict"):
                 
@@ -683,22 +683,43 @@ def test(targets: list, predictions: pd.DataFrame):
         plot_test_scatter(targets, predictions)
 
 
-def view_datasets() -> list:
+def view_datasets(selection: str) -> list:
     """
     Функция для просмотра сохраненных в MinIO датасетов
 
-    - Выгружает из MinIO информацию о сохраненных датасетах
-    - Выводит информацию о сохраненных датасетах клиенту
+    - Выгружает из MinIO метаданные сохраненных датасетов
+    - Формирует интерактивную таблицу просмотра метаданных сохраненных датасетов
+    - Возвращает метаданные выбранных клиентом датасетов
     """
 
     if st.button("Refresh", key="refresh_datasets"):
         pass
 
     datasets = mu.list_datasets()
-    st.write(datasets)
 
     if not datasets:
         st.warning("No datasets available. Let's save your first one!")
+    
+    else:
+        
+        datasets = pd.DataFrame(datasets)
+        datasets.columns = ["Dataset Name", "Size", "Last Modified", "Status"]
+        datasets["Last Modified"] = pd.to_datetime(datasets["Last Modified"], format="%Y-%m-%dT%H:%M:%S.%f")
+        
+        gb = GridOptionsBuilder.from_dataframe(datasets)
+        gb.configure_selection(selection, use_checkbox=True)
+        grid_options = gb.build()
+
+        response = AgGrid(
+            datasets,
+            gridOptions=grid_options,
+            enable_enterprise_modules=False,
+            update_mode="MODEL_CHANGED",
+            height=200,
+            theme="streamlit"
+        )
+
+        return response["selected_rows"]
 
 
 def load_and_save_dataset():
@@ -716,8 +737,9 @@ def load_and_save_dataset():
 
         st.write("Dataset preview (first 5 rows):")
         st.dataframe(dataset.head(), hide_index=True)
+        st.write(f"""*{dataset.shape[0]} row(s), {dataset.shape[1]} column(s)*""")
 
-        filename = st.text_input("""Please, enter file name:""")
+        filename = st.text_input("""Please enter file name:""")
         
         if not filename:
             timestamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
@@ -731,4 +753,107 @@ def load_and_save_dataset():
                 saved_filename = mu.save_dataframe_to_minio(dataset, filename)
                 st.success(f"""Successfully saved to MinIO with DVC as `{saved_filename}`""")
             except Exception as e:
-                st.error(f"Failed: {str(e)}")
+                st.error(f"Failed saving dataset: {str(e)}")
+
+
+def delete_datasets(selected_datasets: list):
+    """
+    Функция для удаления выбранных клиентом датасетов из MinIO при помощи DVC
+
+    - Принимает выбранные клиентом датасеты
+    - Для каждого датасета вызывает функцию, которая удаляет его из хранилища
+    """
+
+    try:
+
+        if not mu.list_datasets():
+            st.warning("There are no datasets to delete yet.")
+            return
+        
+        elif len(selected_datasets) > 0:
+            st.write("Press the button below to delete selected dataset(s)")
+    
+    except TypeError:
+        st.write("""*Select dataset(s) in the [table](#storage) above you want to delete*""")
+        return
+    
+    if "delete_dataset_pending" not in st.session_state:
+        st.session_state.delete_dataset_pending = False
+    
+    if st.button("Delete") or st.session_state.delete_dataset_pending:
+        
+        st.session_state.delete_dataset_pending = True
+
+        st.write(f"""Following dataset(s): ***{", ".join(selected_datasets["Dataset Name"])}*** will be deleted forever""")
+        if st.button("Confirm Delete"):
+            
+            for dataset_name in selected_datasets["Dataset Name"].values.tolist():
+                
+                try:
+                    file_path = mu.remove_dataframe_from_minio(dataset_name=dataset_name)
+                    st.success(f"""Dataset ***{dataset_name}*** at `{file_path}` deleted successfully.""")
+                    sleep(0.5)
+                except Exception as e:
+                    st.error(f"""Error deleting dataset ***{dataset_name}***: {str(e)}""")
+            
+            st.session_state.delete_dataset_pending = False
+            st.rerun()
+
+
+def create_and_train_pipeline():
+    """
+    Функция для пайплайна создания и обучения моделей
+    """
+
+    if "train_dataset_confirm" not in st.session_state:
+        st.session_state.train_dataset_confirm = False
+    if "train_check" not in st.session_state:
+        st.session_state.train_check = False
+    
+    if not st.session_state.train_dataset_confirm:
+
+        st.write("""**Select an existing dataset...**""")
+        st.write("If you don't have a suitable train dataset, please proceed to `Manage Datasets` page to prepare one")
+        
+        dataset_name = view_datasets("single")
+
+        try:
+
+            dataset_name = dataset_name["Dataset Name"].iloc[0]
+
+            if st.button("Download") or st.session_state.train_check:
+
+                try:
+                    
+                    dataset, dataset_path = mu.get_dataframe_from_minio(dataset_name=dataset_name)
+                    st.success(f"""Dataset **{dataset_name}** successfully downloaded from `{dataset_path}`""")
+
+                    features, targets, st.session_state.train_check = check_train_df(dataset)
+
+                    if st.session_state.train_check:
+
+                        if st.button("Lock In Dataframe"):
+                            
+                            st.session_state.train_dataset_confirm = True
+                            st.session_state.train_dataset_name = dataset_name
+                            st.session_state.train_features = features
+                            st.session_state.train_targets = targets
+
+                            st.rerun()
+                
+                except Exception as e:
+                    st.error(f"""Failed downloading dataset ***{dataset_name}***: {str(e)}""")
+        
+        except TypeError:
+            st.warning("Please select a dataset in the table above to continue...")
+
+    else:
+        
+        st.success(f"""You have locked in **{st.session_state.train_dataset_name}** dataset""")
+        if st.button("Change Dataset"):
+            st.session_state.train_dataset_confirm = False
+            st.session_state.train_check = False
+            st.rerun()
+
+        st.write("""**Now let's define the model...**""")
+        create_and_train(features=st.session_state.train_features, targets=st.session_state.train_targets)

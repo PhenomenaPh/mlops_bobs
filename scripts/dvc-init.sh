@@ -6,7 +6,7 @@ set -e
 # Check if .dvc directory exists; if not, initialize DVC without SCM
 if [ ! -d ".dvc" ]; then
     
-    dvc init --subdir
+    dvc init --no-scm
 
     # Add and configure the MinIO remote
     dvc remote add -d minio s3://datasets
