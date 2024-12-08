@@ -1,11 +1,14 @@
 import os
+
+import pandas as pd
+
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
-import pandas as pd
-
 from . import dvc_utils
+
+
 
 # MinIO client configuration
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
@@ -13,11 +16,14 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "datasets")
 
+
+
 # Initialize DVC storage
 dvc_storage = dvc_utils.DVCStorage()
 
 
-def save_dataframe_to_minio(df: pd.DataFrame, filename: str | None = None) -> str:
+
+def save_dataframe_to_minio(df: pd.DataFrame, filename: str) -> str:
     """
     Save a pandas DataFrame using DVC with MinIO as remote storage.
 
@@ -28,19 +34,17 @@ def save_dataframe_to_minio(df: pd.DataFrame, filename: str | None = None) -> st
     Returns:
         str: The name of the saved dataset
     """
-    if filename is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"dataset_{timestamp}"
-    else:
-        # Remove .csv extension if present
-        filename = Path(filename).stem
+    
+    # Remove .csv extension if present
+    filename = Path(filename).stem
 
     # Save using DVC
     file_path = dvc_storage.add_dataset(df, filename)
-    return Path(file_path).stem
+    
+    return Path(file_path)
 
 
-def get_dataframe_from_minio(dataset_name: str) -> pd.DataFrame:
+def get_dataframe_from_minio(dataset_name: str):
     """
     Retrieve a dataset using DVC.
 
@@ -50,12 +54,35 @@ def get_dataframe_from_minio(dataset_name: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The loaded DataFrame
     """
-    # Get dataset using DVC
-    file_path = dvc_storage.get_dataset(dataset_name)
-    if file_path is None:
-        raise Exception(f"Dataset {dataset_name} not found")
 
-    return pd.read_csv(file_path)
+    dvc_data_path = Path("dvc/data")
+    file_path = dvc_data_path / Path(f"{dataset_name}.csv")
+
+    if file_path.exists():
+        # Use cached dataset from local memory
+        pass
+    else:
+        # Pull dataset from MinIO using DVC
+        file_path = dvc_storage.get_dataset(dataset_name)
+
+    return pd.read_csv(file_path), file_path
+
+
+def remove_dataframe_from_minio(dataset_name: str) -> str:
+    """
+    Remove a dataset from MinIO using DVC.
+
+    Args:
+        dataset_name: The name of the dataset to remove
+    
+    Returns:
+        str: Path of the removed dataset
+    """
+    
+    # Remove dataset from MinIO using DVC
+    file_path = dvc_storage.remove_dataset(dataset_name)
+    
+    return file_path
 
 
 def list_datasets() -> list[dict]:
@@ -65,6 +92,7 @@ def list_datasets() -> list[dict]:
     Returns:
         List[Dict]: A list of dictionaries containing dataset information
     """
+    
     datasets = dvc_storage.list_datasets()
 
     # Format the response to match the expected schema
@@ -75,6 +103,7 @@ def list_datasets() -> list[dict]:
             "last_modified": datetime.fromtimestamp(
                 Path(dataset["path"]).stat().st_mtime
             ).isoformat(),
+            "status": dataset["status"],
         }
         for dataset in datasets
     ]

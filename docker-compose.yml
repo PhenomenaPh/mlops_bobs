@@ -1,0 +1,46 @@
+services:
+
+  # Initialize MinIO
+  minio:
+    container_name: minio
+    image: minio/minio:latest
+    hostname: minio
+    ports:
+      - "9000:9000" # primary MinIO service (S3-compatible API endpoint)
+      - "9001:9001" # MinIO Console (web-based UI for managing MinIO)
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_password
+      AWS_REGION: eu-north-1
+    volumes:
+      - ./minio-data:/data
+    command: server --console-address ":9001" /data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/ready || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  # Create MinIO bucket
+  minio-bucket-init:
+    container_name: minio-bucket-init
+    image: minio/mc:latest
+    volumes:
+      - ./scripts/minio-bucket-init.sh:/minio-bucket-init.sh
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/minio-bucket-init.sh"]
+    restart: "no"
+  
+  # Initialize DVC
+  dvc:
+    build:
+      context: ./dvc
+      dockerfile: Dockerfile
+    volumes:
+      - ./scripts/dvc-init.sh:/dvc-init.sh
+      - ./dvc:/dvc
+    entrypoint: ["/bin/bash", "/dvc-init.sh"]
+    restart: "no"
