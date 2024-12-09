@@ -1,10 +1,11 @@
 # ML Model Service
 
-A service for managing and using ML models with both REST and gRPC APIs. This service allows you to create, train, use, and manage multiple machine learning models through a simple API interface.
+A service for managing and using ML models with both REST and gRPC APIs. This service allows you to create, train, use, and manage multiple machine learning models through a simple API interface. Your datasets are managed with DVC and stored in MinIO.
 
 ## Features
 
 - REST and gRPC APIs
+- Dataset management with DVC using MinIO storage
 - Support for multiple ML model types
 - Model lifecycle management (create, train, predict, delete)
 - Hyperparameter customization
@@ -25,14 +26,13 @@ Each model type supports its own set of hyperparameters that can be customized d
 
 ```
 mlops_bobs/
-├── src/
-│   └── mlops_bobs/      
-│       ├── api/         # API implementations
-│       │   ├── rest/    # REST API endpoints
-│       │   └── grpc/    # gRPC service
-│       ├── core/        # Core business logic
-│       ├── config/      # Configuration
-│       └── utils/       # Utility functions
+├── mlops_bobs/      
+│   ├── api/         # API implementations
+│   │   ├── rest/    # REST API endpoints
+│   │   └── grpc/    # gRPC service
+│   ├── core/        # Core business logic
+│   ├── config/      # Configuration
+│   └── utils/       # Utility functions
 ├── dashboard/           # Streamlit dashboard
 ├── tests/               # Test files
 ├── sample_data/         # Sample datasets
@@ -61,9 +61,9 @@ poetry install
 
 ## Running the Service
 
-1. Start the REST API server:
+1. Start the Service:
 ```bash
-poetry run python scripts/start_rest.py
+docker compose up -d
 ```
 
 2. Access the Swagger documentation at:
@@ -71,14 +71,17 @@ poetry run python scripts/start_rest.py
 http://localhost:8000/docs
 ```
 
-## Running the Dashboard
-
-1.  Start the Streamlit Dashboard:
-```bash
-streamlit run dashboard/streamlit_dashboard.py
+3. Access the MinIO Console at:
 ```
+http://localhost:9001/login
+```
+- username = `minio_user`
+- password = `minio_password`
 
-2.  Log In the Dashboard
+3. Access the Streamlit dashboard at:
+```
+http://localhost:8501
+```
 - username = `hse_mlops_2024`
 - password = `strong_password`
 
