@@ -20,7 +20,7 @@ from . import minio_utils as mu
 USERNAME = "hse_mlops_2024"
 PASSWORD = "strong_password"
 # URL API сервиса
-API_BASE_URL = "http://0.0.0.0:8000/api/v1"
+API_BASE_URL = "http://rest-api:8000/api/v1"
 
 
 
@@ -143,7 +143,7 @@ def get_models() -> pd.DataFrame:
         st.error(f"Error fetching models. Response: {response.status_code}.")
 
 
-def view_models() -> list:
+def view_models(selection_mode: str) -> list:
     """
     Функция для просмотра и выбора обученных моделей
 
@@ -161,7 +161,7 @@ def view_models() -> list:
     else:
 
         gb = GridOptionsBuilder.from_dataframe(models_df[["Model Name", "Model Type", "Created At", "Model ID"]])
-        gb.configure_selection("multiple", use_checkbox=True)
+        gb.configure_selection(selection_mode, use_checkbox=True)
         grid_options = gb.build()
 
         response = AgGrid(
@@ -345,7 +345,7 @@ def create_and_train(features: list, targets: list):
     
     model_name = st.text_input("How would you name it?")
     if (models_df is not None) and (model_name in models_df["Model Name"].values.tolist()):
-        st.warning(f"""Model **{model_name}** already exists. Training will override it.""")
+        st.warning(f"""Model ***{model_name}*** already exists. Training will override it.""")
     
     st.write("""**Finally, let's play with hyperparameters...**""")
 
@@ -581,8 +581,8 @@ def predict(selected_models: list, features: list, df: pd.DataFrame) -> list:
     """
     
     if selected_models is not None:
-            
-        st.write(f"""Selected model(s): ***{", ".join(selected_models["Model Name"])}***""")
+
+        st.warning(f"""Selected model(s): ***{", ".join(selected_models["Model Name"])}***""")
             
         if st.button("Predict"):
                 
@@ -665,7 +665,7 @@ def test(targets: list, predictions: pd.DataFrame):
         st.error("Error getting Target. Please try loading your test set again.")
     
     elif predictions is None:
-        st.error("Error getting Predictions. Please select some [models](#trained-models) and make Predictions with them first.")
+        st.error("Error getting Predictions. Please make them with the locked in model first.")
     
     else:
 
@@ -683,7 +683,7 @@ def test(targets: list, predictions: pd.DataFrame):
         plot_test_scatter(targets, predictions)
 
 
-def view_datasets(selection: str) -> list:
+def view_datasets(selection_mode: str) -> list:
     """
     Функция для просмотра сохраненных в MinIO датасетов
 
@@ -707,7 +707,7 @@ def view_datasets(selection: str) -> list:
         datasets["Last Modified"] = pd.to_datetime(datasets["Last Modified"], format="%Y-%m-%dT%H:%M:%S.%f")
         
         gb = GridOptionsBuilder.from_dataframe(datasets)
-        gb.configure_selection(selection, use_checkbox=True)
+        gb.configure_selection(selection_mode, use_checkbox=True)
         grid_options = gb.build()
 
         response = AgGrid(
@@ -803,6 +803,13 @@ def delete_datasets(selected_datasets: list):
 def create_and_train_pipeline():
     """
     Функция для пайплайна создания и обучения моделей
+
+    - Позволяет клиенту выбрать датасет для выгрузки
+    - Выводит клиенту превью загруженного им датасета
+    - Проводит базовые проверки корректности датасета и не позволяет продолжить дальше при возникновении ошибок
+    - Запоминает выбранный клиентом рабочий датасет, дает возможность сменить его при необходимости
+    - Позволяет клиенту выбрать тип модели для обучения и задать ее гиперпараметры
+    - Создает модель с выбранными клиентом параметрами и обучает ее на выбранном клиентом датасете
     """
 
     if "train_dataset_confirm" not in st.session_state:
@@ -813,7 +820,7 @@ def create_and_train_pipeline():
     if not st.session_state.train_dataset_confirm:
 
         st.write("""**Select an existing dataset...**""")
-        st.write("If you don't have a suitable train dataset, please proceed to `Manage Datasets` page to prepare one")
+        st.write("If you don't have a suitable dataset, please proceed to `Manage Datasets` page to prepare one")
         
         dataset_name = view_datasets("single")
 
@@ -826,7 +833,7 @@ def create_and_train_pipeline():
                 try:
                     
                     dataset, dataset_path = mu.get_dataframe_from_minio(dataset_name=dataset_name)
-                    st.success(f"""Dataset **{dataset_name}** successfully downloaded from `{dataset_path}`""")
+                    st.success(f"""Dataset ***{dataset_name}*** successfully downloaded from `{dataset_path}`""")
 
                     features, targets, st.session_state.train_check = check_train_df(dataset)
 
@@ -845,11 +852,11 @@ def create_and_train_pipeline():
                     st.error(f"""Failed downloading dataset ***{dataset_name}***: {str(e)}""")
         
         except TypeError:
-            st.warning("Please select a dataset in the table above to continue...")
+            st.warning("""Please select a ***dataset*** in the [table](#create-train-models) above to continue...""")
 
     else:
         
-        st.success(f"""You have locked in **{st.session_state.train_dataset_name}** dataset""")
+        st.success(f"""You have locked in ***{st.session_state.train_dataset_name}*** dataset""")
         if st.button("Change Dataset"):
             st.session_state.train_dataset_confirm = False
             st.session_state.train_check = False
@@ -857,3 +864,92 @@ def create_and_train_pipeline():
 
         st.write("""**Now let's define the model...**""")
         create_and_train(features=st.session_state.train_features, targets=st.session_state.train_targets)
+
+
+def predict_and_test_pipeline(selected_models: list):
+    """
+    Функция для пайплайна получения предсказаний и тестирования качества моделей
+
+    - Позволяет клиенту выбрать датасет для выгрузки
+    - Выводит клиенту превью загруженного им датасета
+    - Проводит базовые проверки корректности датасета и не позволяет продолжить дальше при возникновении ошибок
+    - Запоминает выбранный клиентом рабочий датасет, дает возможность сменить его при необходимости
+    - Позволяет клиенту выбрать обученные модели для получения предсказаний и тестирования их качества
+    - Возвращает предсказания выбранных клиентом моделей для выбранного клиентом датасета и добавляет их к нему для сравнения
+    - Выводит клиенту сравнительную информацию по качеству выбранных клиентом моделей на выбранном клиентом датасете
+    """
+
+    try:
+        
+        if len(selected_models) == 0:
+            st.warning("You have to train a model first.")
+        
+        else:
+
+            if "predict_dataset_confirm" not in st.session_state:
+                st.session_state.predict_dataset_confirm = False
+            if "predict_check" not in st.session_state:
+                st.session_state.predict_check = False
+            
+            if not st.session_state.predict_dataset_confirm:
+
+                st.write("""**Select an existing dataset...**""")
+                st.write("If you don't have a suitable dataset, please proceed to `Manage Datasets` page to prepare one")
+                
+                dataset_name = view_datasets("single")
+
+                try:
+
+                    dataset_name = dataset_name["Dataset Name"].iloc[0]
+
+                    if st.button("Download") or st.session_state.predict_check:
+
+                        try:
+                            
+                            dataset, dataset_path = mu.get_dataframe_from_minio(dataset_name=dataset_name)
+                            st.success(f"""Dataset ***{dataset_name}*** successfully downloaded from `{dataset_path}`""")
+
+                            st.session_state.target = st.toggle("My data has Target", value=True)
+                            features, targets, st.session_state.predict_check = check_predict_test_df(df=dataset, target=st.session_state.target)
+
+                            if st.session_state.predict_check:
+
+                                if st.button("Lock In Dataframe"):
+                                    
+                                    st.session_state.predict_dataset_confirm = True
+                                    st.session_state.predict_dataset_name = dataset_name
+                                    st.session_state.predict_dataset = dataset
+                                    st.session_state.predict_features = features
+                                    st.session_state.predict_targets = targets
+
+                                    st.rerun()
+                        
+                        except Exception as e:
+                            st.error(f"""Failed downloading dataset ***{dataset_name}***: {str(e)}""")
+                
+                except TypeError:
+                    st.warning("""Please select a ***dataset*** in the [table](#predict-test-models) above to continue...""")
+            
+            else:
+        
+                st.success(f"""You have locked in ***{st.session_state.predict_dataset_name}*** dataset""")
+                if st.button("Change Dataset"):
+                    st.session_state.predict_dataset_confirm = False
+                    st.session_state.predict_check = False
+                    st.rerun()
+                
+                st.write("""**Now let's make some predictions...**""")
+                predictions = predict(
+                    selected_models=selected_models,
+                    features=st.session_state.predict_features,
+                    df=st.session_state.predict_dataset,
+                )
+
+                st.write("""**Finally, let's test the quality of trained model(s)...**""")
+                if st.session_state.target:
+                    test(targets=st.session_state.predict_targets, predictions=predictions)
+                else:
+                    st.warning("You have to have a Target to test your model(s).")
+    
+    except TypeError:
+        st.warning("""Please select a ***model*** in the [table](#trained-models) above to continue...""")

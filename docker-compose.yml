@@ -35,12 +35,47 @@ services:
     restart: "no"
   
   # Initialize DVC
-  dvc:
+  dvc-init:
+    container_name: dvc-init
     build:
       context: ./dvc
       dockerfile: Dockerfile
     volumes:
       - ./scripts/dvc-init.sh:/dvc-init.sh
       - ./dvc:/dvc
+    depends_on:
+      minio-bucket-init:
+        condition: service_started
     entrypoint: ["/bin/bash", "/dvc-init.sh"]
     restart: "no"
+
+  # Initialize REST API server
+  rest-api:
+    container_name: rest-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: rest-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./dvc:/app/dvc
+    depends_on:
+      dvc-init:
+        condition: service_started
+    restart: unless-stopped
+
+  # Initialize Streamlit dashboard
+  streamlit-dashboard:
+    container_name: streamlit-dashboard
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./dvc:/app/dvc
+    depends_on:
+      dvc-init:
+        condition: service_started
+    restart: unless-stopped
