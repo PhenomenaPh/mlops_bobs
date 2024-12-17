@@ -14,7 +14,10 @@ RUN pip install --no-cache-dir poetry
 COPY pyproject.toml poetry.lock ./
 
 # Install dependencies with Poetry
-RUN poetry install
+RUN poetry install --no-root
+
+# Install ClearML (если не добавлено в pyproject.toml)
+RUN poetry add clearml || pip install clearml
 
 # Copy required files in working directory
 COPY mlops_bobs/ mlops_bobs/
@@ -23,6 +26,11 @@ COPY scripts/ scripts/
 
 # Expose the port of REST API service
 EXPOSE 8000
+
+# Add ClearML environment variables for debugging (если не передаются в docker-compose.yml)
+ENV CLEARML_API_HOST=http://clearml-server:8008
+ENV CLEARML_API_ACCESS_KEY=clearml_user
+ENV CLEARML_API_SECRET_KEY=clearml_password
 
 # Run REST API service
 CMD ["poetry", "run", "python", "scripts/start_rest.py"]

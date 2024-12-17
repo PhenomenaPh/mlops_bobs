@@ -11,6 +11,7 @@ from dashboard.utils import minio_utils
 from ...core.model_implementations import LinearRegressionModel, RandomForestModel
 from ...core.models import ModelRegistry
 from . import schemas
+from clearml import Task
 
 
 router = APIRouter()
@@ -67,9 +68,15 @@ async def create_model(request: schemas.ModelCreate) -> schemas.ModelResponse:
 @router.post('/models/{model_id}/train')
 async def train_model(model_id: str, data: schemas.TrainingData) -> dict:
     """Train a specific model."""
+
+    # Инициализация задачи ClearML
+    task = Task.init(project_name="Мой проект", task_name="REST Train Model")
+    task.connect({"model_id": model_id})
+
     try:
         model = model_registry.get_model(model_id)
         if model is None:
+            task.close()
             raise HTTPException(status_code=404, detail=f'Model {model_id} not found')
 
         X = np.array(data.features)
@@ -78,10 +85,17 @@ async def train_model(model_id: str, data: schemas.TrainingData) -> dict:
         model.train(X, y)
         model_registry.save_model(model_id, model, model_registry._models[model_id])
 
+        # Логирование метрик
+        task.set_metric("train_score", model.model.score(X, y))
+
+        task.close()
+
         return {'message': f'Model {model_id} trained successfully'}
     except HTTPException:
+        task.close()
         raise
     except Exception as e:
+        task.close()
         logger.error(f'Failed to train model: {e!s}')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

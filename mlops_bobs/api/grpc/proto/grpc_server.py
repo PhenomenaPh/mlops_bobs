@@ -6,6 +6,8 @@ import service_pb2_grpc
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 import logging
+from clearml import Task
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grpc_server")
@@ -15,6 +17,12 @@ models_store = {}
 
 class ModelService(service_pb2_grpc.ModelServiceServicer):
     def TrainModel(self, request, context):
+
+        # Инициализация задачи ClearML
+        task = Task.init(project_name="Мой проект", task_name="gRPC TrainModel")
+        task.connect(request.hyperparameters)
+
+
         if request.model_type == "linear_regression":
             model = LinearRegression()
         elif request.model_type == "random_forest":
@@ -24,6 +32,7 @@ class ModelService(service_pb2_grpc.ModelServiceServicer):
         else:
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details("Unsupported model type")
+            task.close()
             return service_pb2.TrainResponse()
 
         # Обучение модели
@@ -31,8 +40,13 @@ class ModelService(service_pb2_grpc.ModelServiceServicer):
         y = request.target
         model.fit(X, y)
 
+        # Логирование метрик
+        task.set_metric("train_score", model.score(X, y))
+
         model_id = str(uuid.uuid4())
         models_store[model_id] = model
+
+        task.close()
         return service_pb2.TrainResponse(model_id=model_id)
 
     def Predict(self, request, context):

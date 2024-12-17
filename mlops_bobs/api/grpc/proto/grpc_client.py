@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import service_pb2
 import service_pb2_grpc
+from clearml import Task
 
 
 def load_data(file_path):
@@ -28,6 +29,9 @@ def load_data(file_path):
     return training_data, target.tolist()
 
 def run():
+    # Инициализация ClearML для клиента
+    task = Task.init(project_name="Мой проект", task_name="gRPC Client Run")
+
     with grpc.insecure_channel('localhost:50051') as channel:
         stub = service_pb2_grpc.ModelServiceStub(channel)
 
@@ -42,6 +46,8 @@ def run():
         )
 
         train_response = stub.TrainModel(train_request)
+        task.logger.info(f"Model trained with ID: {train_response.model_id}")
+
         print(f"Model trained with ID: {train_response.model_id}")
 
         # Предсказание на основе обученной модели
@@ -50,7 +56,9 @@ def run():
             data=training_data
         )
         predict_response = stub.Predict(predict_request)
-        print(f"Predictions: {predict_response.predictions}")
+        task.logger.info(f"Predictions: {predict_response.predictions}")
 
+        print(f"Predictions: {predict_response.predictions}")
+    task.close()
 if __name__ == '__main__':
     run()

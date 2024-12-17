@@ -8,6 +8,7 @@ import numpy as np
 from loguru import logger
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from clearml import Task
 
 from .models import BaseMLModel, ModelMetadata  # Updated import
 
@@ -43,10 +44,18 @@ class LinearRegressionModel(SklearnModelMixin, BaseMLModel):
         """Train the linear regression model."""
         self._validate_input(X, "training")
 
+        # Инициализация задачи ClearML
+        task = Task.init(project_name='Мой проект', task_name='Тренировка LinearRegression')
+
         try:
             logger.info("Training LinearRegression model...")
             self.model.set_params(**self._hyperparameters)
             self.model.fit(X, y)
+
+            # Логирование метрик в ClearML
+            task.set_metric('train_loss', self.model.score(X, y))
+
+
             logger.info("Model training completed successfully")
         except Exception as e:
             logger.error(f"Failed to train model: {str(e)}")
@@ -58,7 +67,13 @@ class LinearRegressionModel(SklearnModelMixin, BaseMLModel):
 
         try:
             logger.debug("Making predictions with LinearRegression model...")
-            return self.model.predict(X)
+            predictions = self.model.predict(X)
+
+            # Логирование метрик предсказаний в ClearML
+            task = Task.current_task()  # Получаем текущую задачу
+            task.set_metric('predictions', predictions.mean())
+
+            return predictions
         except Exception as e:
             logger.error(f"Failed to make predictions: {str(e)}")
             raise

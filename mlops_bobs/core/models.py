@@ -8,7 +8,7 @@ from typing import Any, Optional
 import joblib
 from loguru import logger
 from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
-
+from clearml import Task
 
 class ModelMetadata(PydanticBaseModel):
     """Metadata for ML models."""
@@ -64,6 +64,11 @@ class ModelRegistry:
 
     def save_model(self, model_id: str, model: BaseMLModel, metadata: ModelMetadata) -> None:
         """Save model and its metadata to storage."""
+
+        # Логирование в ClearML
+        task = Task.init(project_name='Мой проект', task_name='Save Model')
+        task.set_parameter('model_name', metadata.model_name)
+
         try:
             existing_model_id = None
             for model_id, meta in self._models.items():

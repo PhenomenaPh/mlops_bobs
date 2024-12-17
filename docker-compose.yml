@@ -63,6 +63,10 @@ services:
     depends_on:
       dvc-init:
         condition: service_started
+    environment:
+      CLEARML_API_HOST: "http://clearml-server:8008"
+      CLEARML_API_ACCESS_KEY: "clearml_user"
+      CLEARML_API_SECRET_KEY: "clearml_password"
     restart: unless-stopped
 
   # Initialize Streamlit dashboard
@@ -78,4 +82,20 @@ services:
     depends_on:
       dvc-init:
         condition: service_started
+    environment:
+      CLEARML_API_HOST: "http://clearml-server:8008"
+      CLEARML_API_ACCESS_KEY: "clearml_user"
+      CLEARML_API_SECRET_KEY: "clearml_password"
+    restart: unless-stopped
+
+  clearml-server:
+    container_name: clearml-server
+    image: allegroai/clearml:latest
+    ports:
+      - "8080:8080"   # Web-интерфейс ClearML
+      - "8008:8008"   # API сервер
+      - "8888:8888"   # File Server
+    environment:
+      CLEARML_API_ACCESS_KEY: clearml_user
+      CLEARML_API_SECRET_KEY: clearml_password
     restart: unless-stopped
