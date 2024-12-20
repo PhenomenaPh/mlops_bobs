@@ -8,6 +8,9 @@ import numpy as np
 from loguru import logger
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error
+import mlflow
+import mlflow.sklearn
 
 from .models import BaseMLModel, ModelMetadata  # Updated import
 
@@ -45,8 +48,25 @@ class LinearRegressionModel(SklearnModelMixin, BaseMLModel):
 
         try:
             logger.info("Training LinearRegression model...")
-            self.model.set_params(**self._hyperparameters)
-            self.model.fit(X, y)
+            with mlflow.start_run():
+                # Логируем гиперпараметры
+                for param_name, param_value in self._hyperparameters.items():
+                    mlflow.log_param(param_name, param_value)
+
+                # Обучение модели
+                self.model.set_params(**self._hyperparameters)
+                self.model.fit(X, y)
+
+                # Расчёт метрик
+                predictions = self.model.predict(X)
+                r2 = r2_score(y, predictions)
+                mse = mean_squared_error(y, predictions)
+                mlflow.log_metric("r2_score", r2)
+                mlflow.log_metric("mse", mse)
+
+                # Логирование модели
+                mlflow.sklearn.log_model(self.model, artifact_path="model")
+
             logger.info("Model training completed successfully")
         except Exception as e:
             logger.error(f"Failed to train model: {str(e)}")
@@ -130,8 +150,25 @@ class RandomForestModel(SklearnModelMixin, BaseMLModel):
 
         try:
             logger.info('Training RandomForest model...')
-            self.model.set_params(**self._hyperparameters)
-            self.model.fit(X, y)
+            with mlflow.start_run():
+                # Логируем гиперпараметры
+                for param_name, param_value in self._hyperparameters.items():
+                    mlflow.log_param(param_name, param_value)
+
+                self.model.set_params(**self._hyperparameters)
+                self.model.fit(X, y)
+
+                # Расчёт метрик
+                predictions = self.model.predict(X)
+                r2 = r2_score(y, predictions)
+                mse = mean_squared_error(y, predictions)
+
+                mlflow.log_metric("r2_score", r2)
+                mlflow.log_metric("mse", mse)
+
+                # Логируем модель
+                mlflow.sklearn.log_model(self.model, artifact_path="model")
+
             logger.info('Model training completed successfully')
         except Exception as e:
             logger.error(f'Failed to train model: {e!s}')

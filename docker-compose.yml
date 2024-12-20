@@ -79,3 +79,22 @@ services:
       dvc-init:
         condition: service_started
     restart: unless-stopped
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
+    depends_on:
+      - minio
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minio_user
+      AWS_SECRET_ACCESS_KEY: minio_password
+    command: [
+      "mlflow", "server",
+      "--backend-store-uri", "sqlite:///mlflow.db",
+      "--default-artifact-root", "s3://your-bucket-name/mlflow_artifacts",
+      "--host", "0.0.0.0"
+    ]
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow-data:/mlflow
