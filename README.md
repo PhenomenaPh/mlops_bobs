@@ -85,6 +85,11 @@ http://localhost:8501
 - username = `hse_mlops_2024`
 - password = `strong_password`
 
+4. Accessing MLflow:
+```
+http://localhost:5000
+```
+
 ## API Usage
 
 ### REST API Endpoints
